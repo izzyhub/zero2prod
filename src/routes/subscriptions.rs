@@ -25,8 +25,6 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
 
     match result {
         Ok(_) => HttpResponse::Ok(),
-        Err(e) => {
-            HttpResponse::InternalServerError()
-        }
+        Err(e) => HttpResponse::InternalServerError(),
     }
 }
