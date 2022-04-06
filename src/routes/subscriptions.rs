@@ -10,7 +10,6 @@ pub struct FormData {
 }
 
 pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> impl Responder {
-    println!("Hello???");
     let result = sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
@@ -24,11 +23,9 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
     .execute(db_pool.as_ref())
     .await;
 
-    println!("???????????????");
     match result {
         Ok(_) => HttpResponse::Ok(),
         Err(e) => {
-            println!("Failed to execute query: {e}");
             HttpResponse::InternalServerError()
         }
     }
