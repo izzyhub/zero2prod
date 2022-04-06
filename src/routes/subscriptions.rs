@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder};
 use chrono::Utc;
-use log;
 use sqlx::PgPool;
+use tracing;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -10,9 +10,27 @@ pub struct FormData {
     name: String,
 }
 
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip(form, db_pool),
+    fields(
+        subscriber_email = %form.email,
+        subscriber_name = %form.name
+    )
+)]
 pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) -> impl Responder {
-    log::info!("Saving new subscriber details in the database");
-    let result = sqlx::query!(
+    match insert_subscriber(&db_pool, &form).await {
+        Ok(_) => HttpResponse::Ok(),
+        Err(_) => HttpResponse::InternalServerError(),
+    }
+}
+
+#[tracing::instrument(
+    name = "Saving new subscriber details in the database",
+    skip(form, db_pool)
+)]
+pub async fn insert_subscriber(db_pool: &PgPool, form: &FormData) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
@@ -22,17 +40,11 @@ pub async fn subscribe(form: web::Form<FormData>, db_pool: web::Data<PgPool>) ->
         form.name,
         Utc::now()
     )
-    .execute(db_pool.as_ref())
-    .await;
-
-    match result {
-        Ok(_) => {
-            log::info!("New subscriber details have been saved");
-            HttpResponse::Ok()
-        }
-        Err(e) => {
-            log::error!("Failed to execute query: {:?}", e);
-            HttpResponse::InternalServerError()
-        }
-    }
+    .execute(db_pool)
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(())
 }
